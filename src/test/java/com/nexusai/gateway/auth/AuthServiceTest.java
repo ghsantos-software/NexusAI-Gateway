@@ -116,8 +116,6 @@ class AuthServiceTest {
                 .hasMessageContaining("disabled");
     }
 
-    // --- helpers ---
-
     private User makeUser(String email, String passwordHash) {
         var user = new User(email, passwordHash, User.Role.ADMIN);
         user.setTenantId(UUID.randomUUID());

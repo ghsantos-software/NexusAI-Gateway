@@ -125,7 +125,6 @@ class RagServiceTest {
         when(chunkRepository.existsByTenantId(tenantId)).thenReturn(true);
         when(embeddingModel.embed(anyString())).thenThrow(new RuntimeException("API timeout"));
 
-        // Should NOT throw — failure must be handled gracefully
         String context = ragService.findRelevantContext("any query", tenantId);
         assertThat(context).isNull();
     }

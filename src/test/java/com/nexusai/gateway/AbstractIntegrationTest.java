@@ -9,12 +9,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Base class for integration tests.
- *
- * Requires the docker-compose postgres to be running:
- *   docker compose up -d postgres
- *
- * The 'test' profile points to localhost:5433/nexusai (Docker postgres on port 5433).
- * Tables are truncated before each test to ensure a clean state.
+ * Requires postgres running: docker compose up -d postgres
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
@@ -26,7 +21,6 @@ public abstract class AbstractIntegrationTest {
 
     @BeforeEach
     void resetDatabase() {
-        // Truncate in dependency order; CASCADE handles any remaining FK constraints.
         jdbcTemplate.execute(
                 "TRUNCATE TABLE audit_logs, document_chunks, dlp_rules, users, tenants CASCADE"
         );

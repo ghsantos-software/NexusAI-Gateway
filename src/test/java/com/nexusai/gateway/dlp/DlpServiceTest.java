@@ -93,7 +93,6 @@ class DlpServiceTest {
         assertThat(result.maskedText()).doesNotContain("joao@company.com");
         assertThat(result.maskedText()).doesNotContain("91234-5678");
         assertThat(result.maskedText()).doesNotContain("5500 0000 0000 0004");
-        // Non-sensitive data preserved
         assertThat(result.maskedText()).contains("João Silva");
         assertThat(result.maskedText()).contains("Please update the profile");
     }

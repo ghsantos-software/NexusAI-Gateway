@@ -37,13 +37,11 @@ class AuthControllerTest extends AbstractIntegrationTest {
     void register_duplicateEmail_returns400() throws Exception {
         var request = new RegisterRequest("Dup Corp", "dup@dupmail.com", "secure1234");
 
-        // first registration
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
 
-        // second registration with same email
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -75,14 +73,12 @@ class AuthControllerTest extends AbstractIntegrationTest {
 
     @Test
     void login_validCredentials_returns200WithToken() throws Exception {
-        // register first
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new RegisterRequest("Login Corp", "login@corp.com", "password99"))))
                 .andExpect(status().isCreated());
 
-        // then login
         var loginReq = new LoginRequest("login@corp.com", "password99");
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -117,7 +113,6 @@ class AuthControllerTest extends AbstractIntegrationTest {
 
     @Test
     void getMe_withValidToken_returnsUserProfile() throws Exception {
-        // register to get a token
         var registerResp = mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
@@ -128,7 +123,6 @@ class AuthControllerTest extends AbstractIntegrationTest {
         String body = registerResp.getResponse().getContentAsString();
         String token = objectMapper.readTree(body).at("/data/token").asText();
 
-        // use token on /me
         mockMvc.perform(get("/api/v1/users/me")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
