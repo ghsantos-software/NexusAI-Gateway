@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: nexusai-postgres
+    environment:
+      POSTGRES_DB: nexusai
+      POSTGRES_USER: nexusai
+      POSTGRES_PASSWORD: nexusai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U nexusai -d nexusai" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Ollama — local LLM runtime (no API key, runs models on your machine)
+  # First run: docker exec nexusai-ollama ollama pull llama3.2:1b
+  ollama:
+    image: ollama/ollama:latest
+    container_name: nexusai-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+volumes:
+  postgres_data:
+  ollama_data:

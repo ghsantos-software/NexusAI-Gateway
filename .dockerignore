@@ -1,0 +1,10 @@
+target/
+.git/
+.idea/
+*.iml
+.mvn/wrapper/maven-wrapper.jar
+*.md
+.env
+.env.*
+!.env.example
+docker-compose.prod.yml
