@@ -17,7 +17,6 @@ public class CacheConfig {
     public static final String TENANT_CACHE = "tenants";
     public static final String AI_RESPONSE_CACHE = "aiResponses";
 
-    // Wire the TTL from application properties instead of hardcoding it
     @Bean
     public CacheManager cacheManager(AiProperties aiProperties) {
         CaffeineCacheManager manager = new CaffeineCacheManager();

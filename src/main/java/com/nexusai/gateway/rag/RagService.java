@@ -31,7 +31,6 @@ public class RagService {
     // Chunks below this cosine similarity score are ignored as irrelevant
     private static final double SIMILARITY_THRESHOLD = 0.35;
     private static final int DEFAULT_TOP_K = 3;
-    // TODO: add .docx support via Apache POI when needed
     private static final List<String> SUPPORTED_TYPES = List.of(".txt", ".pdf");
 
     @Transactional
@@ -70,10 +69,6 @@ public class RagService {
         return new UploadResponse(filename, chunks.size(), embeddedCount);
     }
 
-    /**
-     * Searches for chunks semantically similar to the query.
-     * Returns null if the tenant has no documents.
-     */
     @Transactional(readOnly = true)
     public String findRelevantContext(String query, UUID tenantId) {
         if (!chunkRepository.existsByTenantId(tenantId)) {
@@ -114,8 +109,6 @@ public class RagService {
         return chunkRepository.findDistinctDocumentNamesByTenantId(tenantId);
     }
 
-    // ── private helpers ───────────────────────────────────────────────────────
-
     private String buildContextBlock(List<SimilarChunk> chunks) {
         var sb = new StringBuilder();
         sb.append("--- RELEVANT COMPANY KNOWLEDGE ---\n");
@@ -151,7 +144,6 @@ public class RagService {
             throw new IllegalArgumentException("File cannot be empty");
         }
         String name = file.getOriginalFilename();
-        // toLowerCase so .PDF and .TXT are accepted too
         String nameLower = name != null ? name.toLowerCase() : "";
         if (SUPPORTED_TYPES.stream().noneMatch(nameLower::endsWith)) {
             throw new IllegalArgumentException("Unsupported file type. Accepted: " + SUPPORTED_TYPES);

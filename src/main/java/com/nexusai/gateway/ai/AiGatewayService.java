@@ -35,7 +35,6 @@ public class AiGatewayService {
     private final AiProperties aiProperties;
     private final CacheManager cacheManager;
 
-    // Metrics — kept simple on purpose
     private final Counter requestsTotal;
     private final Counter errorsTotal;
     private final Timer requestDuration;
@@ -85,13 +84,12 @@ public class AiGatewayService {
         var user = userService.getCurrentUser();
         requestsTotal.increment();
 
-        // Step 1: DLP — mask sensitive data before it reaches the LLM
         var masked = dlpService.mask(request.message());
         if (masked.wasMasked()) {
             log.info("DLP masked {} occurrence(s) for tenant={}", masked.occurrences(), user.getTenantId());
         }
 
-        // Step 2: Cache check — skipped when RAG is active (context changes with documents)
+        // Cache is skipped when RAG is active — context changes with document state
         boolean ragRequested = !Boolean.FALSE.equals(request.useRag());
         String cacheKey = buildCacheKey(user.getTenantId().toString(), masked.maskedText());
         var cache = cacheManager.getCache(CacheConfig.AI_RESPONSE_CACHE);
@@ -104,7 +102,6 @@ public class AiGatewayService {
             }
         }
 
-        // Step 3: RAG — inject relevant context from tenant's documents
         String context = null;
         if (ragRequested) {
             context = ragService.findRelevantContext(masked.maskedText(), user.getTenantId());
@@ -113,10 +110,8 @@ public class AiGatewayService {
             }
         }
 
-        // Step 4: Build system prompt
         String systemPrompt = buildSystemPrompt(request.systemPrompt(), context);
 
-        // Step 5: Call the LLM
         Integer tokensIn = null;
         Integer tokensOut = null;
         String content;
@@ -131,7 +126,6 @@ public class AiGatewayService {
 
             content = aiResponse.getResult().getOutput().getText();
 
-            // Token counts are only available with some providers (OpenAI yes, Ollama sometimes)
             var usage = aiResponse.getMetadata().getUsage();
             if (usage != null) {
                 tokensIn  = usage.getPromptTokens();
@@ -157,7 +151,6 @@ public class AiGatewayService {
         log.info("LLM chat: provider={}, latency={}ms, tokensIn={}, tokensOut={}, dlp={}, rag={}",
                 aiProperties.provider(), latencyMs, tokensIn, tokensOut, masked.wasMasked(), ragUsed);
 
-        // Step 6: Async audit (never blocks the response)
         auditService.log(user.getTenantId(), user.getId(), request.message(),
                 tokensIn, tokensOut, aiProperties.provider(), latencyMs,
                 masked.wasMasked(), ragUsed, AuditLog.Status.SUCCESS);
@@ -167,12 +160,9 @@ public class AiGatewayService {
                 masked.wasMasked(), ragUsed
         );
 
-        // Step 7: Cache — only when RAG not used (RAG results depend on document state)
         if (aiProperties.cacheEnabled() && !ragUsed && cache != null) {
             cache.put(cacheKey, response);
         }
-
-        // TODO: could add conversation history here for multi-turn support
 
         return response;
     }

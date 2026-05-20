@@ -38,8 +38,6 @@ public class User extends TenantAwareEntity implements UserDetails {
         this.role = role;
     }
 
-    // --- UserDetails ---
-
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));

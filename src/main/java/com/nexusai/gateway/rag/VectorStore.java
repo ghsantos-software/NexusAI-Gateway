@@ -32,14 +32,6 @@ public class VectorStore {
         }
     }
 
-    /**
-     * Finds the most similar chunks to the query embedding using cosine distance.
-     * Returns results ordered by similarity descending (most relevant first).
-     *
-     * @param tenantId      restricts results to this tenant
-     * @param queryEmbedding the embedding of the user's query
-     * @param topK          max number of results
-     */
     public List<SimilarChunk> findSimilar(UUID tenantId, float[] queryEmbedding, int topK) {
         String vectorStr = toVectorString(queryEmbedding);
 
@@ -66,9 +58,6 @@ public class VectorStore {
         );
     }
 
-    /**
-     * Converts a float array to pgvector string format: [0.1,0.2,...,0.n]
-     */
     private String toVectorString(float[] embedding) {
         var sb = new StringBuilder("[");
         for (int i = 0; i < embedding.length; i++) {

@@ -45,8 +45,6 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // UserDetailsService is provided by UserService (implements the interface directly)
-
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

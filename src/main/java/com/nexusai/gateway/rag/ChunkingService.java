@@ -47,12 +47,10 @@ public class ChunkingService {
 
     private List<String> splitBySentences(String text) {
         List<String> result = new ArrayList<>();
-        // Split on sentence-ending punctuation followed by whitespace
         String[] sentences = text.split("(?<=[.!?])\\s+");
 
         var current = new StringBuilder();
         for (String sentence : sentences) {
-            // If adding this sentence would exceed the limit, flush the buffer first
             if (current.length() > 0 && current.length() + sentence.length() + 1 > MAX_CHUNK_CHARS) {
                 result.add(current.toString().strip());
                 current.setLength(0);

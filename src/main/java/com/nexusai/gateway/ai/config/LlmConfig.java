@@ -15,7 +15,6 @@ import org.springframework.context.annotation.Primary;
 @Configuration
 public class LlmConfig {
 
-    // Active when nexusai.ai.provider=openai (requires OPENAI_API_KEY env var)
     @Bean
     @ConditionalOnProperty(name = "nexusai.ai.provider", havingValue = "openai")
     public ChatClient openAiChatClient(OpenAiChatModel openAiChatModel) {
@@ -23,8 +22,6 @@ public class LlmConfig {
         return ChatClient.create(openAiChatModel);
     }
 
-    // Active by default when nexusai.ai.provider=ollama (or not set)
-    // Requires Ollama running locally: docker compose up -d ollama
     @Bean
     @Primary
     @ConditionalOnProperty(name = "nexusai.ai.provider", havingValue = "ollama", matchIfMissing = true)
@@ -33,10 +30,8 @@ public class LlmConfig {
         return ChatClient.create(ollamaChatModel);
     }
 
-    // Embeddings always use OpenAI text-embedding-3-small (1536 dimensions).
-    // This matches the vector(1536) column in document_chunks and provides
-    // consistent embedding quality regardless of the chat provider selected.
-    // Requires OPENAI_API_KEY to be set for RAG features to work.
+    // Embeddings always use OpenAI text-embedding-3-small (1536 dims) regardless of the chat
+    // provider, so the vector column in document_chunks stays consistent. Requires OPENAI_API_KEY.
     @Bean
     @Primary
     public EmbeddingModel primaryEmbeddingModel(OpenAiEmbeddingModel openAiEmbeddingModel) {

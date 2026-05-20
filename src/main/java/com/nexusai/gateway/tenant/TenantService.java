@@ -40,8 +40,6 @@ public class TenantService {
         tenantRepository.save(tenant);
     }
 
-    // TODO: add a scheduled job to reset tokensUsedThisMonth at the start of each billing cycle
-
     private String generateSlug(String name) {
         String base = Normalizer.normalize(name, Normalizer.Form.NFD)
                 .replaceAll("[^\\p{ASCII}]", "")

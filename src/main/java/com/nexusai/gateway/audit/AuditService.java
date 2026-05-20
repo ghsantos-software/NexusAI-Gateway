@@ -18,7 +18,6 @@ public class AuditService {
 
     private final AuditRepository auditRepository;
 
-    // TODO: consider batching writes if volume gets high — right now it's one INSERT per request
     @Async("auditExecutor")
     public void log(UUID tenantId, UUID userId, String originalPrompt,
                     Integer tokensIn, Integer tokensOut, String provider,

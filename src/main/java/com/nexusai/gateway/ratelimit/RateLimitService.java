@@ -43,7 +43,6 @@ public class RateLimitService {
         int rpm = requestsPerMinute(tenant.getPlan());
         log.debug("Creating rate limit bucket: tenant={}, plan={}, rpm={}", tenantId, tenant.getPlan(), rpm);
 
-        // Bucket4j 8.x builder API
         return Bucket.builder()
                 .addLimit(Bandwidth.builder()
                         .capacity(rpm)

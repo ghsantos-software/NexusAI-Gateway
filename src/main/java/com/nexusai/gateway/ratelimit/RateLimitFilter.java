@@ -32,7 +32,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
-        // Only rate-limit authenticated AI endpoints
         var tenantId = TenantContext.getTenant();
         if (tenantId == null || !request.getRequestURI().startsWith("/api/v1/ai/")) {
             filterChain.doFilter(request, response);
@@ -40,7 +39,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         if (!rateLimitService.tryConsume(tenantId)) {
-            // Set remaining after the failed attempt (it's 0 when limit is hit)
             response.setHeader("X-RateLimit-Remaining", "0");
             response.setHeader("Retry-After", "60");
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
@@ -56,7 +54,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Set remaining tokens after consuming one for this request
         response.setHeader("X-RateLimit-Remaining", String.valueOf(rateLimitService.availableTokens(tenantId)));
         filterChain.doFilter(request, response);
     }
