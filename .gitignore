@@ -1,0 +1,45 @@
+### Maven ###
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+HELP.md
+
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+
+### VS Code ###
+.vscode/
+
+### Eclipse / STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### OS ###
+.DS_Store
+Thumbs.db
+
+### Environment files — NEVER commit these ###
+.env
+.env.local
+.env.production
+*.env
+
+### Logs ###
+*.log
+logs/
+
+### Application secrets (if ever separated) ###
+application-secrets.yml
+application-local.yml
+
+### Claude Code session data ###
+.claude/
