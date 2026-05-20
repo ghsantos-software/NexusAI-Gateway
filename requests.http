@@ -1,0 +1,180 @@
+### NexusAI Gateway — Example HTTP Requests
+### Compatible with IntelliJ HTTP Client and VS Code REST Client
+
+@baseUrl = http://localhost:8080
+@token = REPLACE_WITH_TOKEN_FROM_LOGIN
+
+# ──────────────────────────────────────────────
+# AUTH
+# ──────────────────────────────────────────────
+
+### 1. Register a new company account (creates tenant + admin user)
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "companyName": "Acme Corp",
+  "email": "admin@acme.com",
+  "password": "secret1234"
+}
+
+### 2. Login with existing account
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@acme.com",
+  "password": "secret1234"
+}
+
+### 3. Register — validation error (password too short)
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "companyName": "Bad Corp",
+  "email": "not-an-email",
+  "password": "short"
+}
+
+# ──────────────────────────────────────────────
+# USERS  (requires Bearer token)
+# ──────────────────────────────────────────────
+
+### 4. Get current user profile (/me)
+GET {{baseUrl}}/api/v1/users/me
+Authorization: Bearer {{token}}
+
+### 5. List all users in the same tenant (ADMIN only)
+GET {{baseUrl}}/api/v1/users
+Authorization: Bearer {{token}}
+
+### 6. Access protected endpoint without token → 403
+GET {{baseUrl}}/api/v1/users/me
+
+# ──────────────────────────────────────────────
+# HEALTH / INFRA
+# ──────────────────────────────────────────────
+
+### 7. Health check
+GET {{baseUrl}}/actuator/health
+
+### 8. Swagger UI (open in browser)
+# http://localhost:8080/swagger-ui.html
+
+# ──────────────────────────────────────────────
+# AI GATEWAY  (requires Bearer token)
+# ──────────────────────────────────────────────
+
+### 9. Simple chat — no sensitive data
+POST {{baseUrl}}/api/v1/ai/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "message": "What are the main benefits of using an AI gateway in a corporate environment?"
+}
+
+### 10. Chat with CPF in prompt — DLP masks it before sending to LLM
+POST {{baseUrl}}/api/v1/ai/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "message": "The customer with CPF 123.456.789-00 is requesting a refund. What is the standard process?"
+}
+
+### 11. Chat with email in prompt — DLP masks it
+POST {{baseUrl}}/api/v1/ai/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "message": "Send a follow-up to joao.silva@empresa.com.br about the pending invoice."
+}
+
+### 12. Chat with multiple sensitive fields — all masked
+POST {{baseUrl}}/api/v1/ai/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "message": "Client João, CPF 987.654.321-00, phone (11) 98765-4321, card 4111 1111 1111 1111. Please summarize this profile."
+}
+
+### 13. Chat with custom system prompt
+POST {{baseUrl}}/api/v1/ai/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "message": "Explain what a JWT token is.",
+  "systemPrompt": "You are a technical mentor for junior developers. Keep explanations simple and add code examples."
+}
+
+### 14. Chat — message too long → 400 validation error
+POST {{baseUrl}}/api/v1/ai/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "message": ""
+}
+
+### 15. Chat — no token → 403
+POST {{baseUrl}}/api/v1/ai/chat
+Content-Type: application/json
+
+{
+  "message": "This should fail."
+}
+
+# ──────────────────────────────────────────────
+# RAG — Document Management  (requires Bearer token)
+# ──────────────────────────────────────────────
+
+### 16. Upload a TXT document
+# Use IntelliJ's multipart support or curl:
+# curl -X POST http://localhost:8080/api/v1/rag/documents \
+#   -H "Authorization: Bearer $TOKEN" \
+#   -F "file=@/path/to/document.txt"
+POST {{baseUrl}}/api/v1/rag/documents
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="company-policy.txt"
+Content-Type: text/plain
+
+NexusAI Gateway is our corporate AI platform.
+All data sent to external LLMs is first scanned for sensitive information.
+CPFs, emails, phone numbers, and credit card numbers are automatically redacted.
+The system supports multiple tenants, each with isolated data.
+--boundary--
+
+### 17. List uploaded documents for current tenant
+GET {{baseUrl}}/api/v1/rag/documents
+Authorization: Bearer {{token}}
+
+### 18. Chat WITH RAG context (default — useRag: null treated as true)
+POST {{baseUrl}}/api/v1/ai/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "message": "What does the company do with sensitive data before sending to the LLM?"
+}
+
+### 19. Chat WITHOUT RAG (explicitly skip context enrichment)
+POST {{baseUrl}}/api/v1/ai/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "message": "What is the capital of Brazil?",
+  "useRag": false
+}
+
+### 20. Delete a document (removes all chunks + embeddings)
+DELETE {{baseUrl}}/api/v1/rag/documents/company-policy.txt
+Authorization: Bearer {{token}}
