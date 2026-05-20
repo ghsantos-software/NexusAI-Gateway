@@ -1,4 +1,3 @@
-# Test profile — uses the same docker-compose postgres as local dev.
 # Run: docker compose up -d postgres  before executing tests.
 
 spring:
@@ -17,7 +16,7 @@ spring:
 nexusai:
   ai:
     provider: ollama
-    cache-enabled: false   # disable cache in tests to avoid cross-test state
+    cache-enabled: false
 
 jwt:
   secret: test-secret-key-for-integration-tests-only-must-be-at-least-32-chars

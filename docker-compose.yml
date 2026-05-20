@@ -6,13 +6,9 @@ services:
       POSTGRES_DB: nexusai
       POSTGRES_USER: nexusai
       POSTGRES_PASSWORD: nexusai
-      # Use md5 so the JDBC driver can authenticate without SCRAM-SHA-256 negotiation issues.
-      # POSTGRES_INITDB_ARGS sets password_encryption=md5 *before* the initial user is created,
-      # ensuring the stored password hash matches the pg_hba.conf auth method.
       POSTGRES_HOST_AUTH_METHOD: md5
       POSTGRES_INITDB_ARGS: "--auth-host=md5 --auth-local=md5"
     ports:
-      # Port 5433 avoids conflicts with any native PostgreSQL installation on 5432.
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -22,7 +18,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Ollama — local LLM runtime (no API key, runs models on your machine)
   # First run: docker exec nexusai-ollama ollama pull llama3.2:1b
   ollama:
     image: ollama/ollama:latest

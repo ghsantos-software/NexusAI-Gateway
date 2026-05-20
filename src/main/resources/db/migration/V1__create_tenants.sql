@@ -1,6 +1,3 @@
--- Tenants are the top-level unit of isolation in the system.
--- Each company that signs up gets one tenant.
-
 CREATE TABLE tenants (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name                    VARCHAR(100)  NOT NULL,
@@ -16,6 +13,5 @@ CREATE TABLE tenants (
 
 CREATE INDEX idx_tenants_slug ON tenants (slug);
 
--- Constraint to prevent negative token counts
 ALTER TABLE tenants ADD CONSTRAINT chk_tokens_non_negative
     CHECK (tokens_used_this_month >= 0);

@@ -25,7 +25,7 @@
         </root>
     </springProfile>
 
-    <!-- Default (test, or any other profile): plain output so tests show logs -->
+    <!-- default/test: plain output -->
     <springProfile name="!dev &amp; !prod">
         <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder>

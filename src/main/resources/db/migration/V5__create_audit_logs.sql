@@ -1,5 +1,4 @@
--- Stores every AI request for compliance and billing purposes.
--- We store a hash of the prompt, never the raw prompt text.
+-- Stores a hash of the prompt, never the raw text, for compliance and billing.
 
 CREATE TABLE audit_logs (
     id             UUID         PRIMARY KEY DEFAULT gen_random_uuid(),

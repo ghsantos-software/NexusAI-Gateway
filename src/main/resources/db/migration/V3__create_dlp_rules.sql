@@ -10,6 +10,3 @@ CREATE TABLE dlp_rules (
 );
 
 CREATE INDEX idx_dlp_rules_tenant_id ON dlp_rules (tenant_id);
-
--- Seed default rules for existing tenants (none yet, but migration is ready)
--- New tenants get default rules inserted by the application layer on registration.

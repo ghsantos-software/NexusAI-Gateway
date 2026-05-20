@@ -36,7 +36,6 @@ spring:
       max-file-size: 20MB
       max-request-size: 20MB
 
-  # Spring AI - provider selected via nexusai.ai.provider
   ai:
     openai:
       api-key: ${OPENAI_API_KEY:changeme}
@@ -56,14 +55,13 @@ spring:
 
 nexusai:
   ai:
-    provider: ${AI_PROVIDER:ollama}   # switch to 'openai' and set OPENAI_API_KEY to use OpenAI
+    provider: ${AI_PROVIDER:ollama}  # openai requires OPENAI_API_KEY
     cache-enabled: true
     cache-ttl-minutes: 5
 
 jwt:
-  # Dev default — always override JWT_SECRET in production (must be at least 32 chars)
-  secret: ${JWT_SECRET:dev-only-secret-do-not-use-in-production-change-me}
-  expiration-ms: ${JWT_EXPIRATION:86400000}   # 24 hours
+  secret: ${JWT_SECRET:dev-only-secret-do-not-use-in-production-change-me}  # min 32 chars in prod
+  expiration-ms: ${JWT_EXPIRATION:86400000}
 
 server:
   port: ${PORT:8080}
