@@ -134,8 +134,8 @@ public class AiGatewayService {
             // Token counts are only available with some providers (OpenAI yes, Ollama sometimes)
             var usage = aiResponse.getMetadata().getUsage();
             if (usage != null) {
-                tokensIn  = usage.getPromptTokens()     != null ? usage.getPromptTokens().intValue()     : null;
-                tokensOut = usage.getGenerationTokens() != null ? usage.getGenerationTokens().intValue() : null;
+                tokensIn  = usage.getPromptTokens();
+                tokensOut = usage.getCompletionTokens();
             }
 
         } catch (Exception e) {

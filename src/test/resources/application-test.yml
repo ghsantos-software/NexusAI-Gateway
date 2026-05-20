@@ -1,0 +1,29 @@
+# Test profile — uses the same docker-compose postgres as local dev.
+# Run: docker compose up -d postgres  before executing tests.
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/nexusai
+    username: nexusai
+    password: nexusai
+  jpa:
+    show-sql: false
+  ai:
+    openai:
+      api-key: test-dummy-key-not-used-in-tests
+    ollama:
+      base-url: http://localhost:11434
+
+nexusai:
+  ai:
+    provider: ollama
+    cache-enabled: false   # disable cache in tests to avoid cross-test state
+
+jwt:
+  secret: test-secret-key-for-integration-tests-only-must-be-at-least-32-chars
+  expiration-ms: 86400000
+
+logging:
+  level:
+    com.nexusai: DEBUG
+    org.springframework.security: WARN

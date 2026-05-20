@@ -143,7 +143,7 @@ cp .env.example .env
 
 | Variable | Default (dev only) | Description |
 |---|---|---|
-| `DB_URL` | `jdbc:postgresql://localhost:5432/nexusai` | PostgreSQL URL |
+| `DB_URL` | `jdbc:postgresql://localhost:5433/nexusai` | PostgreSQL URL (Docker exposes on 5433) |
 | `DB_USER` | `nexusai` | DB user |
 | `DB_PASSWORD` | `nexusai` | DB password |
 | `JWT_SECRET` | *(dev placeholder)* | Min 32 chars — change for production |

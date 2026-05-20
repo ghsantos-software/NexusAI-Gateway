@@ -6,7 +6,7 @@ class NexusAiGatewayApplicationTests extends AbstractIntegrationTest {
 
     @Test
     void contextLoads() {
-        // Validates that the Spring context starts without errors.
-        // AbstractIntegrationTest spins up a real PostgreSQL container via Testcontainers.
+        // Verifies the full Spring context starts without errors.
+        // Requires docker-compose postgres to be running: docker compose up -d postgres
     }
 }

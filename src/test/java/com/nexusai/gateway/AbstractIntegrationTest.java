@@ -1,30 +1,34 @@
 package com.nexusai.gateway;
 
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
+/**
+ * Base class for integration tests.
+ *
+ * Requires the docker-compose postgres to be running:
+ *   docker compose up -d postgres
+ *
+ * The 'test' profile points to localhost:5433/nexusai (Docker postgres on port 5433).
+ * Tables are truncated before each test to ensure a clean state.
+ */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
-@Testcontainers
 @ActiveProfiles("test")
 public abstract class AbstractIntegrationTest {
 
-    @Container
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("pgvector/pgvector:pg16")
-            .withDatabaseName("nexusai_test")
-            .withUsername("nexusai")
-            .withPassword("nexusai");
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
+    @BeforeEach
+    void resetDatabase() {
+        // Truncate in dependency order; CASCADE handles any remaining FK constraints.
+        jdbcTemplate.execute(
+                "TRUNCATE TABLE audit_logs, document_chunks, dlp_rules, users, tenants CASCADE"
+        );
     }
 }

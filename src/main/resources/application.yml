@@ -3,7 +3,7 @@ spring:
     name: nexusai-gateway
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/nexusai}
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/nexusai}
     username: ${DB_USER:nexusai}
     password: ${DB_PASSWORD:nexusai}
     hikari:

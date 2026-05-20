@@ -3,6 +3,7 @@ package com.nexusai.gateway.auth;
 import com.nexusai.gateway.auth.model.User;
 import com.nexusai.gateway.config.JwtProperties;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
@@ -44,8 +45,13 @@ public class JwtService {
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
-        String email = extractEmail(token);
-        return email.equals(userDetails.getUsername()) && !isTokenExpired(token);
+        try {
+            String email = extractEmail(token);
+            return email.equals(userDetails.getUsername()) && !isTokenExpired(token);
+        } catch (JwtException e) {
+            // Expired, tampered, or otherwise invalid
+            return false;
+        }
     }
 
     private boolean isTokenExpired(String token) {

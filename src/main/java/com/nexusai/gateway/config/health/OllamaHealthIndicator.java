@@ -24,8 +24,8 @@ public class OllamaHealthIndicator implements HealthIndicator {
             @Value("${spring.ai.ollama.base-url:http://localhost:11434}") String ollamaUrl) {
 
         this.restTemplate = builder
-                .connectTimeout(Duration.ofSeconds(2))
-                .readTimeout(Duration.ofSeconds(3))
+                .setConnectTimeout(Duration.ofSeconds(2))
+                .setReadTimeout(Duration.ofSeconds(3))
                 .build();
         this.ollamaUrl = ollamaUrl;
     }
