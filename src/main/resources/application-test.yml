@@ -1,0 +1,8 @@
+spring:
+  ai:
+    openai:
+      api-key: sk-test-placeholder-not-real
+
+jwt:
+  secret: "test-secret-key-for-unit-tests-only-must-be-32-bytes-long"
+  expiration-ms: 3600000

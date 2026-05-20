@@ -1,0 +1,98 @@
+spring:
+  application:
+    name: nexusai-gateway
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/nexusai}
+    username: ${DB_USER:nexusai}
+    password: ${DB_PASSWORD:nexusai}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      pool-name: NexusAI-HikariPool
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        default_schema: public
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+
+  cache:
+    type: caffeine
+
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+  # Spring AI - provider selected via nexusai.ai.provider
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:changeme}
+      chat:
+        options:
+          model: gpt-4o-mini
+          temperature: 0.7
+      embedding:
+        options:
+          model: text-embedding-3-small
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      chat:
+        options:
+          model: ${OLLAMA_MODEL:llama3.2:1b}
+          temperature: 0.7
+
+nexusai:
+  ai:
+    provider: ${AI_PROVIDER:ollama}   # switch to 'openai' and set OPENAI_API_KEY to use OpenAI
+    cache-enabled: true
+    cache-ttl-minutes: 5
+
+jwt:
+  # Dev default — always override JWT_SECRET in production (must be at least 32 chars)
+  secret: ${JWT_SECRET:dev-only-secret-do-not-use-in-production-change-me}
+  expiration-ms: ${JWT_EXPIRATION:86400000}   # 24 hours
+
+server:
+  port: ${PORT:8080}
+  error:
+    include-message: always
+    include-binding-errors: always
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        nexusai.request.duration: true
+    tags:
+      application: nexusai-gateway
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: NexusAI Gateway
+    version: '@project.version@'
+    description: Corporate AI Gateway with DLP and RAG

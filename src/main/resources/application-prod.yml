@@ -1,0 +1,29 @@
+spring:
+  jpa:
+    show-sql: false
+
+  datasource:
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 10
+
+server:
+  error:
+    include-message: never
+    include-binding-errors: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Restrict exposure in production — only essentials
+        include: health, metrics, prometheus
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    com.nexusai: INFO
+    org.springframework: WARN
+    root: WARN
