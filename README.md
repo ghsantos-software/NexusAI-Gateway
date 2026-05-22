@@ -1,64 +1,70 @@
 # NexusAI Gateway
 
-A backend study project inspired by the kinds of AI gateway systems used in corporate environments. Built to practice Spring AI, pgvector, multi-tenancy, and a few security/compliance patterns in a realistic context.
+A backend study project that simulates an AI gateway — the kind of service that sits between applications and LLM APIs in companies that need audit trails, data protection, and multi-tenant isolation.
 
-The core idea: instead of letting applications call LLM APIs directly, they go through this gateway, which strips sensitive data from prompts, injects relevant company context, calls the model, and keeps an audit trail — all in one service.
-
----
-
-## Why I built this
-
-I wanted to go beyond simple CRUD projects and explore how AI integrations actually work in the backend. This project gave me hands-on experience with:
-
-- Spring AI and how to abstract LLM providers
-- pgvector and semantic search with raw SQL (Hibernate doesn't support vector types natively)
-- Multi-tenant data isolation without schema-per-tenant complexity
-- Regex-based data masking (Brazilian data types: CPF, phone, credit card)
-- JWT + Spring Security 6 stateless auth
-- Rate limiting with Bucket4j and cache with Caffeine
-- Testcontainers for integration tests against a real PostgreSQL
+Instead of calling OpenAI or Ollama directly, requests go through a pipeline that masks sensitive data, injects relevant context from uploaded documents, and logs a hash of every prompt. All tenants share the same database schema but their data stays isolated via `tenant_id`.
 
 ---
 
-## How it works
+## Key Features
 
-When a request comes in through `POST /api/v1/ai/chat`:
+- **DLP masking** — CPF, email, phone, and credit card are stripped from prompts before reaching the LLM
+- **RAG pipeline** — upload `.txt` or `.pdf` files; relevant chunks are injected into prompts via pgvector cosine similarity search
+- **Multi-tenancy** — row-level isolation; every registered company gets its own `tenant_id` carried in the JWT
+- **Provider-agnostic** — switch between Ollama (local, free) and OpenAI via a single env var
+- **Audit log** — async, stores SHA-256 of the prompt — raw text never persisted
+- **Rate limiting** — per-tenant, plan-based limits with Bucket4j
+- **Response cache** — Caffeine; automatically bypassed when RAG context is active
+
+---
+
+## Request Pipeline
 
 ```
-Request
-  → JWT auth (Spring Security)
-  → Rate limiter (Bucket4j — per tenant, plan-based limits)
-  → DLP masking (CPF, email, phone, credit card replaced with [REDACTED] tokens)
-  → Cache check (Caffeine — skipped if RAG is enabled)
-  → RAG context injection (pgvector similarity search on uploaded documents)
-  → LLM call (Ollama or OpenAI, switchable via env var)
-  → Async audit log (SHA-256 hash of prompt — raw text never stored)
-  → Response
+ Client
+   │
+   ▼
+ ┌─────────────────────────────────────────┐
+ │  JWT validation   (Spring Security 6)   │
+ ├─────────────────────────────────────────┤
+ │  Rate limiter     (Bucket4j)            │  per tenant, plan-based
+ ├─────────────────────────────────────────┤
+ │  DLP masking                            │  CPF, email, phone, card → [REDACTED]
+ ├─────────────────────────────────────────┤
+ │  Cache lookup     (Caffeine)            │  skipped when RAG is active
+ ├─────────────────────────────────────────┤
+ │  RAG context injection  (pgvector)      │  cosine similarity, threshold-filtered
+ ├─────────────────────────────────────────┤
+ │  LLM call         (Spring AI)           │  Ollama or OpenAI
+ ├─────────────────────────────────────────┤
+ │  Async audit log                        │  SHA-256 hash, token count, latency
+ └─────────────────────────────────────────┘
+   │
+   ▼
+ Response
 ```
 
 ---
 
-## Tech stack
+## Tech Stack
 
 | | |
 |---|---|
-| Java 21 | Records, text blocks, pattern matching |
-| Spring Boot 3.2 | Main framework |
-| Spring AI 1.0 | LLM abstraction (Ollama + OpenAI) |
-| PostgreSQL 16 + pgvector | Relational DB + vector similarity search |
-| Flyway 10 | Database migrations |
-| Spring Security 6 + JWT | Stateless auth (JJWT 0.12) |
-| Caffeine | In-memory cache |
-| Bucket4j 8 | Rate limiting per tenant |
-| Micrometer + Prometheus | Metrics |
-| Springdoc OpenAPI 3 | Swagger UI |
-| JUnit 5 + Mockito | Unit tests |
-| Testcontainers | Integration tests with real PostgreSQL |
-| Docker | Local dev environment |
+| **Java 21** | Records, text blocks, pattern matching |
+| **Spring Boot 3.3** | Core framework |
+| **Spring AI 1.0** | LLM abstraction — same code, different provider |
+| **PostgreSQL 16 + pgvector** | Relational DB + vector similarity search |
+| **Flyway 10** | Database migrations |
+| **Spring Security 6 + JJWT 0.12** | Stateless JWT auth |
+| **Caffeine + Bucket4j 8** | Response cache and per-tenant rate limiting |
+| **Micrometer + Prometheus** | Metrics |
+| **Springdoc OpenAPI 3** | Swagger UI |
+| **JUnit 5 + Mockito** | Unit and integration tests |
+| **Docker + docker-compose** | Local dev environment |
 
 ---
 
-## Project structure
+## Project Structure
 
 ```
 src/main/java/com/nexusai/gateway/
@@ -80,11 +86,11 @@ src/main/java/com/nexusai/gateway/
 
 ---
 
-## Running locally
+## Running Locally
 
-**Requirements:** Java 21, Maven, Docker
+**Requirements:** Java 21, Docker
 
-### 1. Clone the project
+### 1. Clone
 
 ```bash
 git clone https://github.com/ghsantos-software/NexusAI-Gateway.git
@@ -103,88 +109,78 @@ docker compose up -d
 docker exec nexusai-ollama ollama pull llama3.2:1b
 ```
 
-This downloads a ~1GB model that runs locally. No API key needed.
+Downloads ~1GB locally. No API key needed.
 
-### 4. Run the application
+### 4. Run
 
 ```bash
-mvn spring-boot:run
+./mvnw spring-boot:run
 ```
 
-The app starts on `http://localhost:8080`.  
+App starts on `http://localhost:8080`  
 Swagger UI: `http://localhost:8080/swagger-ui.html`
 
 ### 5. Quick test
 
 ```bash
-# Register (creates a tenant automatically)
+# Register — creates a tenant automatically
 curl -s -X POST http://localhost:8080/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"companyName":"Acme Corp","email":"admin@acme.com","password":"password123"}' | jq .
 
-# Copy the token from the response and use it:
+# Use the returned token to send a chat message
 curl -s -X POST http://localhost:8080/api/v1/ai/chat \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
-  -d '{"message":"What is the capital of Brazil?"}' | jq .
+  -d '{"message":"Customer CPF 123.456.789-00 needs a refund"}' | jq .
 ```
 
 ---
 
 ## Configuration
 
-All sensitive config uses environment variables with safe defaults for local dev. **Never use the defaults in production.**
-
-Copy the example file and fill in your values:
+Copy the example and fill in your values:
 
 ```bash
 cp .env.example .env
 ```
 
-| Variable | Default (dev only) | Description |
+| Variable | Default (dev) | Description |
 |---|---|---|
-| `DB_URL` | `jdbc:postgresql://localhost:5433/nexusai` | PostgreSQL URL (Docker exposes on 5433) |
+| `DB_URL` | `jdbc:postgresql://localhost:5433/nexusai` | PostgreSQL URL |
 | `DB_USER` | `nexusai` | DB user |
 | `DB_PASSWORD` | `nexusai` | DB password |
-| `JWT_SECRET` | *(dev placeholder)* | Min 32 chars — change for production |
+| `JWT_SECRET` | *(dev placeholder)* | **Min 32 chars in production** |
 | `JWT_EXPIRATION` | `86400000` | Token TTL in ms (24h) |
 | `AI_PROVIDER` | `ollama` | `ollama` or `openai` |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
 | `OLLAMA_MODEL` | `llama3.2:1b` | Model to use |
 | `OPENAI_API_KEY` | *(empty)* | Required when `AI_PROVIDER=openai` |
 
-### Using OpenAI
-
-```bash
-# In your .env file:
-AI_PROVIDER=openai
-OPENAI_API_KEY=sk-your-key-here
-```
-
-> **Note about RAG:** Even when using Ollama for chat, the RAG feature requires an OpenAI API key because embeddings always use `text-embedding-3-small` (1536 dimensions). This avoids dimension mismatches with the pgvector column.
+> **RAG + embeddings:** even when using Ollama for chat, the RAG feature always uses OpenAI `text-embedding-3-small` (1536 dimensions) for embeddings. This keeps the pgvector column dimensions consistent. Requires `OPENAI_API_KEY`.
 
 ---
 
-## API overview
+## API Reference
 
 ### Auth
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/v1/auth/register` | Register a new company account (creates tenant + admin user) |
+| `POST` | `/api/v1/auth/register` | Register company — creates tenant + admin user |
 | `POST` | `/api/v1/auth/login` | Login, returns JWT |
 
 ### AI Gateway
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/v1/ai/chat` | Send a chat message through the full pipeline |
+| `POST` | `/api/v1/ai/chat` | Send a message through the full pipeline |
 
-**Request body:**
+**Request:**
 ```json
 {
   "message": "Customer CPF 123.456.789-00 wants a refund",
-  "systemPrompt": "Optional override for the system prompt",
+  "systemPrompt": "Optional system prompt override",
   "useRag": true
 }
 ```
@@ -202,13 +198,13 @@ OPENAI_API_KEY=sk-your-key-here
 }
 ```
 
-### RAG (Document Management)
+### Documents (RAG)
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/v1/rag/documents` | Upload a .txt or .pdf file |
+| `POST` | `/api/v1/rag/documents` | Upload `.txt` or `.pdf` |
 | `GET` | `/api/v1/rag/documents` | List uploaded documents |
-| `DELETE` | `/api/v1/rag/documents/{name}` | Delete a document and its vectors |
+| `DELETE` | `/api/v1/rag/documents/{name}` | Delete document and its vectors |
 
 ### Other
 
@@ -217,50 +213,55 @@ OPENAI_API_KEY=sk-your-key-here
 | `GET` | `/api/v1/users/me` | Current user profile |
 | `GET` | `/api/v1/users` | List tenant users (admin only) |
 | `GET` | `/api/v1/audit` | Audit log, paginated (admin only) |
-| `GET` | `/actuator/health` | App health + Ollama status |
+| `GET` | `/actuator/health` | App health + Ollama connectivity |
 | `GET` | `/actuator/prometheus` | Prometheus metrics |
 
-Full collection: `NexusAI-Gateway.postman_collection.json` (import into Postman — register/login auto-save the token).
+Full Postman collection: `NexusAI-Gateway.postman_collection.json` — register and login auto-save the token.
 
 ---
 
-## Running tests
+## Running Tests
 
 ```bash
-# Docker must be running — Testcontainers spins up a real PostgreSQL container
-mvn test
+# Start postgres first
+docker compose up -d postgres
+
+# Run all tests
+./mvnw test
 ```
 
-The integration tests in `AbstractIntegrationTest` use the `pgvector/pgvector:pg16` Docker image via Testcontainers, so they run against real migrations without needing a pre-existing database.
+Integration tests in `AbstractIntegrationTest` connect to the docker-compose postgres using the `test` profile (`application-test.yml`). The database is truncated before each test class. No external test infra needed beyond Docker.
 
 ---
 
-## Multi-tenancy
+## Architecture Notes
 
-Every registered company gets its own `tenant_id`. All tables have a `tenant_id` column and every query filters by it. The tenant is extracted from the JWT and stored in a `ThreadLocal` for the duration of each request.
+### Multi-tenancy
 
-No schema-per-tenant: simpler to operate, and row-level isolation is enough for this use case.
+Every registered company gets a `tenant_id` (UUID). All tables have a `tenant_id` column and every query filters by it. The value comes from the JWT and is stored in a `ThreadLocal` for the duration of each request.
 
----
+Row-level isolation, single schema — simpler to operate than schema-per-tenant, and sufficient for this use case.
 
-## DLP masking
+### DLP masking
 
-Four patterns applied in order before the prompt reaches the LLM:
+Four regex patterns applied in order before the prompt reaches the LLM:
 
-| Data type | Example input | Replaced with |
+| Type | Example | Token |
 |---|---|---|
 | Credit card | `4111 1111 1111 1111` | `[CARD_REDACTED]` |
-| Brazilian CPF | `123.456.789-00` | `[CPF_REDACTED]` |
+| CPF | `123.456.789-00` | `[CPF_REDACTED]` |
 | Email | `user@company.com` | `[EMAIL_REDACTED]` |
-| Brazilian phone | `(11) 98765-4321` | `[PHONE_REDACTED]` |
+| BR phone | `(11) 98765-4321` | `[PHONE_REDACTED]` |
 
-Credit card pattern runs first to avoid partial matches from the phone regex.
+Credit card runs first to avoid false positives from the phone number regex on card digit sequences.
 
----
+### pgvector and raw SQL
 
-## Metrics
+Hibernate 6 doesn't support `vector` column types natively, so vector operations use `JdbcTemplate` with raw SQL. Cosine distance (`<=>`) is handled directly in the query — not a workaround, just the right tool for this case.
 
-Three Prometheus metrics exposed at `/actuator/prometheus`:
+### Metrics
+
+Three counters/timers exposed at `/actuator/prometheus`:
 
 | Metric | Type |
 |---|---|
@@ -270,24 +271,27 @@ Three Prometheus metrics exposed at `/actuator/prometheus`:
 
 ---
 
-## Things I'd improve with more time
+## Things I'd Improve
 
-- **Multi-instance rate limiting**: The current `ConcurrentHashMap` buckets reset on restart. For horizontal scaling, this would need Redis + Bucket4j's `ProxyManager`.
-- **Token usage tracking**: The monthly token counter exists in the `tenants` table but billing enforcement isn't wired yet.
-- **Monthly token reset**: Would need a scheduled job to reset `tokens_used_this_month` at the billing cycle boundary.
-- **`.docx` support**: RAG currently accepts `.txt` and `.pdf`. Adding Word documents via Apache POI would be straightforward.
-- **Conversation history**: The AI chat is stateless right now. Multi-turn conversations would require storing and passing message history.
-- **Better error messages from Ollama**: When the model isn't pulled yet, the error message could be more specific.
+- **Rate limiting across instances** — the current `ConcurrentHashMap` buckets reset on restart. Horizontal scaling would need Redis + Bucket4j's `ProxyManager`
+- **Token billing enforcement** — the `tokens_used_this_month` column exists in the tenants table but the limit isn't enforced yet; would also need a scheduled reset job
+- **Conversation history** — chat is stateless; multi-turn would need a message store and context window management
+- **`.docx` support** — easy addition with Apache POI, `.txt` and `.pdf` already work via PDFBox
+- **Better Ollama error messages** — when the model isn't pulled yet, the error propagation could be more descriptive
 
 ---
 
-## What I learned
+## What I Learned
 
-- **Spring AI abstractions are genuinely useful**: Switching between Ollama and OpenAI is a single env var change. The `ChatClient` abstraction handles the rest.
-- **pgvector + JdbcTemplate**: Hibernate 6 doesn't support custom types like `vector` natively, so raw SQL via `JdbcTemplate` was the right call — not a workaround, just using the right tool.
-- **Filter double-registration is a real Spring Boot gotcha**: `@Component` filters auto-register as servlet filters AND inside the Spring Security chain unless you explicitly disable one. This was the trickiest bug to track down.
-- **Testcontainers makes integration tests reliable**: No more "works on my machine but not in CI" database tests.
-- **SHA-256 for audit logs feels like overkill until you think about it**: Storing raw prompts creates a data liability. Hashing them preserves auditability without keeping the content.
+**Spring AI abstractions are genuinely useful.** Switching between Ollama and OpenAI is a single env var — no code changes. The `ChatClient` handles provider differences transparently.
+
+**pgvector with JdbcTemplate is the right call.** When Hibernate doesn't support a type, raw SQL is cleaner than fighting the ORM. The cosine distance query is readable and explicit.
+
+**Spring Security filter double-registration is a real gotcha.** A `@Component` filter registers both as a servlet filter and inside the security chain unless you explicitly prevent one. Tracking that down was the trickiest debugging session in the project.
+
+**SHA-256 for audit logs is the right tradeoff.** Storing raw prompts creates a data liability. Hashing gives you auditability and duplicate detection without keeping the content.
+
+**Row-level multi-tenancy is simpler than it sounds.** The hardest part is being consistent — every single query needs the tenant filter. A `TenantAwareEntity` base class and ThreadLocal context handle most of it automatically.
 
 ---
 
