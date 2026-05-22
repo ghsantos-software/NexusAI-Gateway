@@ -1,5 +1,12 @@
 # NexusAI Gateway
 
+![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3-6DB33F?logo=springboot&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-yellow)
+![CI](https://img.shields.io/github/actions/workflow/status/ghsantos-software/NexusAI-Gateway/ci.yml?label=build&logo=githubactions&logoColor=white)
+
 A backend study project that simulates an AI gateway — the kind of service that sits between applications and LLM APIs in companies that need audit trails, data protection, and multi-tenant isolation.
 
 Instead of calling OpenAI or Ollama directly, requests go through a pipeline that masks sensitive data, injects relevant context from uploaded documents, and logs a hash of every prompt. All tenants share the same database schema but their data stays isolated via `tenant_id`.
@@ -9,12 +16,23 @@ Instead of calling OpenAI or Ollama directly, requests go through a pipeline tha
 ## Key Features
 
 - **DLP masking** — CPF, email, phone, and credit card are stripped from prompts before reaching the LLM
-- **RAG pipeline** — upload `.txt` or `.pdf` files; relevant chunks are injected into prompts via pgvector cosine similarity search
+- **RAG pipeline** — upload `.txt` or `.pdf` files; relevant chunks are injected via pgvector cosine similarity search
 - **Multi-tenancy** — row-level isolation; every registered company gets its own `tenant_id` carried in the JWT
-- **Provider-agnostic** — switch between Ollama (local, free) and OpenAI via a single env var
+- **Provider-agnostic** — switch between Ollama (local, free) and OpenAI with a single env var
 - **Audit log** — async, stores SHA-256 of the prompt — raw text never persisted
 - **Rate limiting** — per-tenant, plan-based limits with Bucket4j
 - **Response cache** — Caffeine; automatically bypassed when RAG context is active
+
+---
+
+## Architecture Highlights
+
+- **Spring AI abstraction** — `ChatClient` handles both Ollama and OpenAI behind the same interface; switching providers is one env var, zero code changes
+- **DLP before the network** — prompts are masked locally before any HTTP call; the LLM never sees real CPFs, emails, or card numbers
+- **pgvector via JdbcTemplate** — Hibernate 6 doesn't support `vector` types natively; raw SQL with cosine distance (`<=>`) is cleaner than fighting the ORM
+- **Row-level multi-tenancy** — single schema, `tenant_id` on every table, value extracted from JWT and stored in `ThreadLocal` per request
+- **Hash-only audit trail** — SHA-256 of each prompt is stored, never the raw text; auditability without data liability
+- **Smart cache invalidation** — Caffeine cache is skipped when RAG is active, since injected context changes per query
 
 ---
 
@@ -43,6 +61,8 @@ Instead of calling OpenAI or Ollama directly, requests go through a pipeline tha
    ▼
  Response
 ```
+
+→ [Architecture diagram](docs/architecture.md) · [Pipeline flowchart](docs/request-pipeline.md)
 
 ---
 
@@ -117,8 +137,13 @@ Downloads ~1GB locally. No API key needed.
 ./mvnw spring-boot:run
 ```
 
-App starts on `http://localhost:8080`  
-Swagger UI: `http://localhost:8080/swagger-ui.html`
+App starts on `http://localhost:8080`
+
+| Interface | URL |
+|---|---|
+| Swagger UI | `http://localhost:8080/swagger-ui.html` |
+| Prometheus metrics | `http://localhost:8080/actuator/prometheus` |
+| Health check | `http://localhost:8080/actuator/health` |
 
 ### 5. Quick test
 
@@ -128,7 +153,7 @@ curl -s -X POST http://localhost:8080/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"companyName":"Acme Corp","email":"admin@acme.com","password":"password123"}' | jq .
 
-# Use the returned token to send a chat message
+# Send a chat message with sensitive data — watch DLP kick in
 curl -s -X POST http://localhost:8080/api/v1/ai/chat \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
@@ -157,7 +182,7 @@ cp .env.example .env
 | `OLLAMA_MODEL` | `llama3.2:1b` | Model to use |
 | `OPENAI_API_KEY` | *(empty)* | Required when `AI_PROVIDER=openai` |
 
-> **RAG + embeddings:** even when using Ollama for chat, the RAG feature always uses OpenAI `text-embedding-3-small` (1536 dimensions) for embeddings. This keeps the pgvector column dimensions consistent. Requires `OPENAI_API_KEY`.
+> **RAG + embeddings:** even when using Ollama for chat, RAG always uses OpenAI `text-embedding-3-small` (1536 dimensions). This keeps the pgvector column dimensions consistent across providers. Requires `OPENAI_API_KEY`.
 
 ---
 
@@ -230,38 +255,38 @@ docker compose up -d postgres
 ./mvnw test
 ```
 
-Integration tests in `AbstractIntegrationTest` connect to the docker-compose postgres using the `test` profile (`application-test.yml`). The database is truncated before each test class. No external test infra needed beyond Docker.
+Integration tests extend `AbstractIntegrationTest`, which connects to the docker-compose postgres using the `test` profile. The database is truncated before each test class. No external dependencies needed beyond Docker.
+
+CI runs the same test suite automatically on every push — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ---
 
-## Architecture Notes
-
-### Multi-tenancy
-
-Every registered company gets a `tenant_id` (UUID). All tables have a `tenant_id` column and every query filters by it. The value comes from the JWT and is stored in a `ThreadLocal` for the duration of each request.
-
-Row-level isolation, single schema — simpler to operate than schema-per-tenant, and sufficient for this use case.
+## Technical Notes
 
 ### DLP masking
 
-Four regex patterns applied in order before the prompt reaches the LLM:
+Four regex patterns applied in order before the prompt leaves the service:
 
-| Type | Example | Token |
+| Type | Example | Replaced with |
 |---|---|---|
 | Credit card | `4111 1111 1111 1111` | `[CARD_REDACTED]` |
 | CPF | `123.456.789-00` | `[CPF_REDACTED]` |
 | Email | `user@company.com` | `[EMAIL_REDACTED]` |
 | BR phone | `(11) 98765-4321` | `[PHONE_REDACTED]` |
 
-Credit card runs first to avoid false positives from the phone number regex on card digit sequences.
+Credit card runs first to avoid false positives from the phone regex matching card digit sequences.
 
-### pgvector and raw SQL
+### Multi-tenancy
 
-Hibernate 6 doesn't support `vector` column types natively, so vector operations use `JdbcTemplate` with raw SQL. Cosine distance (`<=>`) is handled directly in the query — not a workaround, just the right tool for this case.
+Row-level isolation with a single schema. Every table has `tenant_id`, every query filters by it. The value is extracted from the JWT at the security filter and stored in `ThreadLocal` for the duration of the request. No schema-per-tenant overhead.
+
+### pgvector
+
+Hibernate 6 doesn't support custom column types like `vector`. Vector operations (insert, cosine similarity search) use `JdbcTemplate` with raw SQL — explicit, readable, no ORM friction.
 
 ### Metrics
 
-Three counters/timers exposed at `/actuator/prometheus`:
+Exposed at `/actuator/prometheus`:
 
 | Metric | Type |
 |---|---|
@@ -273,11 +298,11 @@ Three counters/timers exposed at `/actuator/prometheus`:
 
 ## Things I'd Improve
 
-- **Rate limiting across instances** — the current `ConcurrentHashMap` buckets reset on restart. Horizontal scaling would need Redis + Bucket4j's `ProxyManager`
-- **Token billing enforcement** — the `tokens_used_this_month` column exists in the tenants table but the limit isn't enforced yet; would also need a scheduled reset job
-- **Conversation history** — chat is stateless; multi-turn would need a message store and context window management
-- **`.docx` support** — easy addition with Apache POI, `.txt` and `.pdf` already work via PDFBox
-- **Better Ollama error messages** — when the model isn't pulled yet, the error propagation could be more descriptive
+- **Rate limiting across instances** — current `ConcurrentHashMap` buckets reset on restart; horizontal scaling needs Redis + Bucket4j's `ProxyManager`
+- **Token billing enforcement** — `tokens_used_this_month` exists in the DB but the limit isn't enforced yet; needs a scheduled reset job too
+- **Conversation history** — chat is stateless; multi-turn requires a message store and context window management
+- **`.docx` support** — straightforward Apache POI addition; `.txt` and `.pdf` already work via PDFBox
+- **Ollama error messages** — when the model isn't pulled yet, the error could be more descriptive than a generic 500
 
 ---
 
@@ -287,11 +312,11 @@ Three counters/timers exposed at `/actuator/prometheus`:
 
 **pgvector with JdbcTemplate is the right call.** When Hibernate doesn't support a type, raw SQL is cleaner than fighting the ORM. The cosine distance query is readable and explicit.
 
-**Spring Security filter double-registration is a real gotcha.** A `@Component` filter registers both as a servlet filter and inside the security chain unless you explicitly prevent one. Tracking that down was the trickiest debugging session in the project.
+**Spring Security filter double-registration is a real gotcha.** A `@Component` filter auto-registers as both a servlet filter and inside the security chain unless you explicitly disable one. Tracking that down was the trickiest debugging session in the project.
 
 **SHA-256 for audit logs is the right tradeoff.** Storing raw prompts creates a data liability. Hashing gives you auditability and duplicate detection without keeping the content.
 
-**Row-level multi-tenancy is simpler than it sounds.** The hardest part is being consistent — every single query needs the tenant filter. A `TenantAwareEntity` base class and ThreadLocal context handle most of it automatically.
+**Row-level multi-tenancy is simpler than it sounds.** The hardest part is being consistent — every query needs the tenant filter. A `TenantAwareEntity` base class and ThreadLocal context handle most of it automatically.
 
 ---
 
